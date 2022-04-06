@@ -1,0 +1,134 @@
+getwd()
+setwd('D:/PM2.5')
+data <- read.csv("final tnmt2.csv")
+head(data)
+View(data)
+library(grid)
+library(foreign)
+library(gridSVG)
+library(lmtest)
+library(tsModel)
+library(Epi)
+library(splines)
+library(vcd)
+library(ggplot2)
+
+
+# Install packages required for the analysis (uncomment if needed)
+# load the packages
+
+# read data from csv file
+data <- read.csv("D:/PM2.5/final tnmt2.csv")
+head(data)
+summary(data$Pressure)
+# This dataset includes the following variables:
+# year
+# month
+# timeelapsed = elapsed time since the start of the study
+# NguyenCongHoan = concentration of PM2.5 on NguyencongHoan road
+# GCXHintroduced = quarantine (the intervention) coded 0 before intervention, 1 after
+#Step 3: Descriptive analyses
+#######################################
+# Examining the data is an important first step
+# Looking at the pre-intervention trend can give an indication of how stable the
+#   trend is over time, whether a linear model is likely to be appropriate, and
+#   whether there appears to be a seasonal trend
+# compute the standardized rates
+data$tp <- with(data, Pressure)
+# start the plot, excluding the points and the x-axis
+plot(data$tp,type="l",ylim=c(00,3600),xlab="date", ylab="Pressure",
+  bty="l",xaxt="n")
+# shade the post intervention period grey
+rect(22,0,48,3600,col=grey(0.9),border=F)
+# plot the observed rate for pre-intervention period
+lines(data$tp,type="l",pch=0.9)
+#specify the x-axis (i.e. time units)
+axis(1,at=0:3*22,labels=F)
+axis(1,at=0:2*22+11,tick=F,labels=c("truoc gcxh", "trong gcxh", "sau gcxh"))
+title("Pressure, 1-5")
+
+# It is also useful to produce summary statistics
+summary(data$Pressure)
+#tabulate aces before and after gian cach xa hoi
+summary(data$tp[data$GCXH==0])
+summary(data$tp[data$GCXH==1])
+
+
+## line plot
+
+#Step 4: Gaussian regression model
+# In step 2 (main paper) we chose a step change model and we used a Gaussian
+#   model as we are using continuous data
+model1 <- glm(data$Pressure ~ GCXH + timeelapsed, family=gaussian,data)
+summary(model1)
+summary(model1)$dispersion
+round(ci.lin(model1,Exp=T),3)
+pred1 <- predict(model1,type="response")
+
+# to plot the counterfactual scenario we create a data frame as if quarrantine
+datanew <- data.frame(GCXH=0, timeelapsed=1:60, month=1:5)
+
+# generate predictions under the counterfactual scenario and add it to the plot
+pred1b <- predict(model1,datanew,type="response")
+lines(pred1b,col=2,lty=2)
+datanew <- data.frame(GCXH=rep(c(0,1,0),c(36,10,14))
+  ,timeelapsed=1:60,month=rep(c(1,2,3,4,5),c(12,12,12,12,12)),data$Pressure)
+
+# Check the residuals by plotting against time
+res2 <- residuals(model1,type="deviance")
+plot(data$timeelapsed,res2,ylim=c(-1,1),pch=19,cex=0.7,col=grey(0.6),
+main="Residuals over time",ylab="Deviance residuals",xlab="Date")
+abline(h=0,lty=2,lwd=2)
+
+# Further check for autocorrelation by examining the autocorrelation and
+#   partial autocorrelation functions
+acf(res2)
+pacf(res2)
+
+# add a change-in-slope
+# we parameterize it as an interaction between time and the quarrantine
+model4 <- glm(data$Pressure ~ GCXH*timeelapsed, family=gaussian, data)
+summary(model4)
+round(ci.lin(model4,Exp=T),3)
+pred4b <- predict(model4,type="response")
+plot(data$Pressure,type="l",ylim=c(0,3600),xlab="day",ylab="Pressure concentration",
+     bty="l",xaxt="n")
+rect(22,0,48,3600,col=grey(0.9),border=F)
+lines(data$Pressure,cex=0.7)
+axis(1,at=0:3*22,labels=F)
+axis(1,at=0:2*22+11,tick=F,labels=c("truoc gcxh", "trong gcxh", "sau gcxh"))
+title("Pressure concentration, Jannuary, 2020 - May, 2020")
+lines(1:60,pred1,col=2)
+lines(1:60,pred4b,col=4)
+lines(1:60,pred1b,col=2,lty=2)
+legend("topleft",c("Step-change only","Step-change + change-in-slope", "counterfactual"),lty=c(1,1,2),
+       col=c(2,4,2),inset=0.05,bty="n",cex=0.7)
+
+
+# test if the change-in-slope improve the fit
+# the selected test here is an F-test, which accounts for the overdispersion,
+#   while in other cases a likelihood ratio or wald test can be applied
+anova(model1,model4,test="F")
+# not surprisingly, the p-value is similar to that of the interaction term
+
+#Stepchange and change in slope
+plot(data$Pressure,type="l",ylim=c(0,3600),xlab="day",ylab="Pressure concentration",
+     bty="l",xaxt="n")
+rect(22,0,44,3600,col=grey(0.9),border=F)
+lines(data$Pressure,cex=0.7)
+axis(1,at=0:3*22,labels=F)
+axis(1,at=0:2*22+11,tick=F,labels=c("truoc gcxh", "trong gcxh", "sau gcxh"))
+title("Pressure concentration, January, 2020 - May, 2020")
+lines(1:60,pred4b,col=4)
+
+#ve 2 duong mau do
+plot(data$Pressure,type="l",ylim=c(0,3600),xlab="day",ylab="Pressure concentration",
+     bty="l",xaxt="n")
+rect(22,0,44,3600,col=grey(0.9),border=F)
+lines(data$Pressure,cex=0.7)
+axis(1,at=0:3*22,labels=F)
+axis(1,at=0:2*22+11,tick=F,labels=c("truoc gcxh", "trong gcxh", "sau gcxh"))
+title("Pressure concentration, January, 2020 - May, 2020")
+lines(1:60,pred1,col=2)
+lines(1:60,pred1b,col=2,lty=2)
+
